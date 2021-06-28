@@ -272,9 +272,9 @@ fn setup(
         //drawing circle
         let circle = &circle[0];
         commands.spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Torus { radius: 0.2, ring_radius: circle.radius_sq.sqrt()+0.1, subdivisions_segments: 32, subdivisions_sides: 24 })),
-            material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
-            transform: Transform::from_translation(circle.center.to_tuple().into()).looking_at(circle.normal.to_tuple().into(), Vec3::Y),
+            mesh: meshes.add(Mesh::from(shape::Torus { radius: circle.radius_sq.sqrt(), ring_radius: 0.1, subdivisions_segments: 32, subdivisions_sides: 24 })),
+            material: materials.add(Color::BLUE.into()),
+            transform: Transform {translation: circle.center.to_tuple().into(), rotation: Quat::from_rotation_arc(Vec3::Y,circle.normal.normalize().to_tuple().into()), scale: Vec3::ONE},
             ..Default::default()
         });
 
