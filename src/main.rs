@@ -86,7 +86,7 @@ impl<T> Intersect<Line<T>,T> for Ball<T> where T: Copy + num_traits::Num + Squar
         let difference = object.start-self.center;
         let a = object.direction.square_length();
         let b = T::from(2.0)*(object.direction.dot(difference));
-        let c = difference.square_length()-self.radius*self.radius;
+        let c = difference.square_length()-self.radius_sq;
         let discriminant = b*b-T::from(4.0)*a*c;
 
         if discriminant>T::zero() {
@@ -127,8 +127,28 @@ impl<T> Intersect<Ball<T>,T> for Ball<T> where T: Copy + num_traits::Num + Squar
     type Intersection=Circle<T>;
 
     fn intersections(&self, object: &Ball<T>) -> Box<[Self::Intersection]> {
-        let center_distance = (self.center-object.center).square_length();
-        todo!()
+        let vector = object.center-self.center;
+        let center_distance_squared = vector.square_length();
+        let center_distance = center_distance_squared.sqrt();
+        let vector_normalized = vector/center_distance;
+        /*
+        r1^2-x^2=r^2
+        r2^2-(d-x)^2=r^2
+
+        r1^2-x^2=r2^2-(d-x)^2
+        r1^2-x^2=r2^2-d^2+2dx-x^2
+        d^2+r1^2-r2^2=2dx
+        (d^2+r1^2-r2^2)/2d=x
+        */
+
+        let circle_center_distance_from_self_center = (center_distance_squared+self.radius_sq-object.radius_sq)/(T::from(2.0)*center_distance);
+        let circle_center = self.center+vector_normalized*circle_center_distance_from_self_center;
+        let circle_radius_squared = self.radius_sq-circle_center_distance_from_self_center*circle_center_distance_from_self_center;
+        Box::new([Circle{
+            center: circle_center,
+            radius_sq: circle_radius_squared,
+            normal: vector,     // or normalized vector?
+        }])
     }
 }
 
@@ -143,13 +163,13 @@ pub struct Line<T> where T: Copy + num_traits::Num {
 #[derive(Debug)]
 pub struct Ball<T> where T: Copy + num_traits::Num {
     center: Point3D<T,UnknownUnit>,
-    radius: T,
+    radius_sq: T,
 }
 
 pub struct Circle<T> where T: Copy + num_traits::Num {
     center: Point3D<T,UnknownUnit>,
-    radius: T,
-    normal: Vector3D<T,UnknownUnit>,
+    radius_sq: T,
+    normal: Vector3D<T,UnknownUnit>,    // or normalized vector?
 }
 
 impl<T> Reflect<T> for Ball<T> where T: Copy + num_traits::Num + SquareRoot + From<f32> + PartialOrd {
@@ -200,7 +220,7 @@ fn setup(
 
     let ball: Ball<f32> = Ball{
         center:(0.0,0.0,0.0).into(),
-        radius:5.0,
+        radius_sq:25.0,
     };
 
     let now = std::time::Instant::now();
@@ -233,10 +253,38 @@ fn setup(
         });
     }
 
+    //drawing ball
     commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Icosphere { radius: ball.radius as f32, subdivisions: 5 })),
+        mesh: meshes.add(Mesh::from(shape::Icosphere { radius: ball.radius_sq.sqrt() as f32, subdivisions: 5 })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
         transform: Transform::from_translation(ball.center.to_tuple().into()),
+        ..Default::default()
+    });
+
+    let ball2: Ball<f32> = Ball{
+        center:(4.0,2.0,0.0).into(),
+        radius_sq:16.0,
+    };
+
+    let circle = ball.intersections(&ball2);
+
+    if circle.len()>0 {
+        //drawing circle
+        let circle = &circle[0];
+        commands.spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Torus { radius: 0.2, ring_radius: circle.radius_sq.sqrt()+0.1, subdivisions_segments: 32, subdivisions_sides: 24 })),
+            material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),
+            transform: Transform::from_translation(circle.center.to_tuple().into()).looking_at(circle.normal.to_tuple().into(), Vec3::Y),
+            ..Default::default()
+        });
+
+    }
+
+    //drawing second ball
+    commands.spawn_bundle(PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Icosphere { radius: ball2.radius_sq.sqrt() as f32, subdivisions: 5 })),
+        material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+        transform: Transform::from_translation(ball2.center.to_tuple().into()),
         ..Default::default()
     });
 
