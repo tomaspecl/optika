@@ -4,7 +4,10 @@ use std::fmt::Debug;
 use euclid::*;
 use bevy::prelude::*;
 use euclid::Vector3D;
+use num_integer::Integer;
+use num_traits::Signed;
 
+#[derive(Copy, Clone)]
 struct Num {
     // a*sqrt(b)/c
     a: i128,
@@ -14,7 +17,112 @@ struct Num {
 
 impl Num {
     pub fn new(a: i128, b: u128, c: u128) -> Self {
-        Num{a,b,c}
+        Num{a,b,c}.normalize()
+    }
+
+    pub fn normalize(mut self) -> Self {
+        self.reduce_sqrt();
+        self.reduce_fraction();
+
+        self
+    }
+
+    pub fn reduce_sqrt(&mut self) {
+        let mut i = 2u128;
+        while i*i<=self.b {
+            if self.b%(i*i)==0 {
+                self.b/=i*i;
+                self.a*=i as i128;
+            }else{
+                i+=1;
+            }
+        }
+    }
+
+    pub fn reduce_fraction(&mut self) {
+        let divisor = if self.a.is_negative() {
+            (self.a.abs() as u128).gcd(&self.c)
+        }else{
+            (self.a as u128).gcd(&self.c)
+        };
+        self.a/=divisor as i128;
+        self.c/=divisor;
+    }
+}
+
+impl std::ops::Add for Num {
+    type Output=Num;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        if self.b==rhs.b {
+            // a*sqrt(b)/c + d*sqrt(b)/e = sqrt(b)*(a/c + d/e) = sqrt(b)*(ae+dc)/ce
+            let mut num = Num {
+                a: self.a*rhs.c as i128 + rhs.a*self.c as i128,
+                b: self.b,
+                c: self.c*self.c,
+            };
+            num.reduce_fraction();
+            num
+        }else{
+            todo!()
+        }
+    }
+}
+
+impl std::ops::Sub for Num {
+    type Output=Num;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        if self.b==rhs.b {
+            // a*sqrt(b)/c + d*sqrt(b)/e = sqrt(b)*(a/c + d/e) = sqrt(b)*(ae+dc)/ce
+            let mut num = Num {
+                a: self.a*rhs.c as i128 - rhs.a*self.c as i128,
+                b: self.b,
+                c: self.c*self.c,
+            };
+            num.reduce_fraction();
+            num
+        }else{
+            todo!()
+        }
+    }
+}
+
+impl std::ops::Mul for Num {
+    type Output=Num;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Num {
+            a: self.a*rhs.a,
+            b: self.b*rhs.b,
+            c: self.c*rhs.c,
+        }.normalize()
+    }
+}
+
+impl std::ops::Div for Num {
+    type Output=Num;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        if self.a.is_negative() ^ rhs.a.is_negative() {
+            // result negative
+        }else{
+            //result positive
+        }
+        Num {
+            a: self.a*rhs.c as i128,
+            b: self.b*rhs.b,
+            c: self.c*rhs.a*rhs.b,
+        }.normalize()
+        todo!()
+    }
+}
+
+impl std::ops::Rem for Num {
+    type Output=Num;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        todo!()
     }
 }
 

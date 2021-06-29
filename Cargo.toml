@@ -9,4 +9,5 @@ edition = "2018"
 [dependencies]
 euclid = "0.22.2"
 num-traits = "0.2.14"
+num-integer = "0.1.44"
 bevy = "0.5.0"
