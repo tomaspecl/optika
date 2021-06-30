@@ -1,13 +1,13 @@
 extern crate num_traits;
 
-use std::fmt::Debug;
+use std::{cmp::Ordering, fmt::Debug};
 use euclid::*;
 use bevy::prelude::*;
 use euclid::Vector3D;
 use num_integer::Integer;
 use num_traits::Signed;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Num {
     // a*sqrt(b)/c
     a: i128,
@@ -47,6 +47,93 @@ impl Num {
         };
         self.a/=divisor as i128;
         self.c/=divisor;
+    }
+}
+
+impl SquareRoot for Num {
+    fn sqrt(self) -> Self {
+        let mut x = self;
+        assert!(x.a>0);
+        x.reduce_sqrt();
+        x.reduce_fraction();
+        assert!(x.b==1);
+        Num::new(1,x.a as u128*x.c,x.c)
+    }
+}
+
+impl Into<f64> for Num {
+    fn into(self) -> f64 {
+        self.a as f64 * (self.b as f64).sqrt() / self.c as f64
+    }
+}
+
+impl From<f32> for Num {
+    fn from(a: f32) -> Self {
+        assert!(a.is_finite());
+        let two_to_23 = 8_388_608;
+        let x = (a*two_to_23 as f32) as i128;
+
+        Num::new(x,1,two_to_23 as u128)
+    }
+}
+
+impl PartialOrd for Num {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.a.is_negative() ^ other.a.is_negative() {
+            //one is negative
+            if self.a.is_negative() {
+                Some(Ordering::Less)
+            }else{
+                Some(Ordering::Greater)
+            }
+        }else if self.a.is_negative() {
+            //both are negative -> flip the comparison
+            let left = (self.a*self.a) as u128*other.c*other.c*self.b;
+            let right = (other.a*other.a) as u128*self.c*self.c*other.b;
+            right.partial_cmp(&left)
+        }else{
+            //both are positive
+            let left = (self.a*self.a) as u128*other.c*other.c*self.b;
+            let right = (other.a*other.a) as u128*self.c*self.c*other.b;
+            left.partial_cmp(&right)
+        }
+    }
+}
+
+impl PartialEq for Num {
+    fn eq(&self, other: &Self) -> bool {
+        let x = self.normalize();
+        let y = other.normalize();
+        x.a==y.a && x.b==y.b && x.c==y.c
+    }
+}
+
+impl num_traits::Num for Num {
+    type FromStrRadixErr=();
+
+    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        todo!()
+    }
+}
+
+impl num_traits::Zero for Num {
+    fn zero() -> Self {
+        Num::new(0, 1, 1)
+    }
+
+    fn is_zero(&self) -> bool {
+        self.a==0 || self.b==0
+    }
+}
+
+impl num_traits::One for Num {
+    fn one() -> Self {
+        Num::new(1, 1, 1)
+    }
+
+    fn is_one(&self) -> bool {
+        let x = self.normalize();
+        x.a==1 && x.b==1 && x.c==1
     }
 }
 
@@ -106,15 +193,19 @@ impl std::ops::Div for Num {
     fn div(self, rhs: Self) -> Self::Output {
         if self.a.is_negative() ^ rhs.a.is_negative() {
             // result negative
+            Num {
+                a: -1*self.a.abs()*rhs.c as i128,
+                b: self.b*rhs.b,
+                c: self.c*rhs.a.abs() as u128*rhs.b,
+            }.normalize()
         }else{
             //result positive
+            Num {
+                a: self.a.abs()*rhs.c as i128,
+                b: self.b*rhs.b,
+                c: self.c*rhs.a.abs() as u128*rhs.b,
+            }.normalize()
         }
-        Num {
-            a: self.a*rhs.c as i128,
-            b: self.b*rhs.b,
-            c: self.c*rhs.a*rhs.b,
-        }.normalize()
-        todo!()
     }
 }
 
@@ -301,6 +392,11 @@ impl<T> Reflect<T> for Ball<T> where T: Copy + num_traits::Num + SquareRoot + Fr
 }
 
 fn main() {
+
+    //test Num
+    let x = Num::from(6.125);
+    dbg!(x);
+
     App::build()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
